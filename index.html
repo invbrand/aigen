@@ -767,8 +767,7 @@
             formData.append('image_file', blob, 'source.png');
 
             try {
-                // FIX: Corrected API endpoint URL
-                const response = await fetch('https://clipdrop-api.co/segment/v1', {
+                const response = await fetch('https://clipdrop-api.co/remove-background/v1', {
                     method: 'POST',
                     headers: { 'x-api-key': apiKey },
                     body: formData,
@@ -779,12 +778,33 @@
                     throw new Error(`Clipdrop API Error (${response.status}): ${errorText}`);
                 }
                 
-                const maskBlob = await response.blob();
-                const maskBitmap = await createImageBitmap(maskBlob);
+                const imageBlob = await response.blob();
+                const imageBitmap = await createImageBitmap(imageBlob);
 
-                offscreenMaskCanvas.width = maskBitmap.width;
-                offscreenMaskCanvas.height = maskBitmap.height;
-                offscreenMaskCtx.drawImage(maskBitmap, 0, 0);
+                // Create a temporary canvas to get the alpha channel
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = imageBitmap.width;
+                tempCanvas.height = imageBitmap.height;
+                tempCtx.drawImage(imageBitmap, 0, 0);
+
+                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                const data = imageData.data;
+                const maskData = new Uint8ClampedArray(data.length);
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const alpha = data[i + 3]; // Get alpha value
+                    maskData[i] = alpha;     // Set R, G, B to the alpha value
+                    maskData[i + 1] = alpha;
+                    maskData[i + 2] = alpha;
+                    maskData[i + 3] = 255;   // Make mask fully opaque
+                }
+                
+                const maskImageData = new ImageData(maskData, tempCanvas.width, tempCanvas.height);
+
+                offscreenMaskCanvas.width = maskImageData.width;
+                offscreenMaskCanvas.height = maskImageData.height;
+                offscreenMaskCtx.putImageData(maskImageData, 0, 0);
                 
                 return true;
 
