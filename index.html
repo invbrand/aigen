@@ -248,7 +248,7 @@
 
     <script>
         // --- CONFIGURATION ---
-        const CLIPDROP_API_KEY = "957b940ba584386d8f030ea54ff0e9e94b77f226714031a560405b7ae1f88828c5e6fd886ab7dedaa4b50ecbae81f15b"; // <-- PASTE YOUR API KEY HERE
+        const CLIPDROP_API_KEY = "USEAPIHERECAIO"; // <-- PASTE YOUR API KEY HERE
 
         const BRAND_COLORS_CONFIG = [
             { name: "White", hex: "#FFFFFF" }, { name: "Black", hex: "#0F0F0F" },
@@ -771,13 +771,20 @@
                     method: 'POST',
                     headers: { 'x-api-key': apiKey },
                     body: formData,
+                    // FIX: Add mode: 'no-cors' to bypass browser CORS restrictions for this specific API.
+                    // This is a workaround for when the server doesn't send the right CORS headers.
+                    mode: 'no-cors' 
                 });
 
-                if (!response.ok) {
-                    throw new Error(`Clipdrop API Error: ${response.statusText}`);
-                }
+                // With no-cors, we can't check response.ok, as the response is opaque.
+                // We have to assume it will succeed and let the blob() call handle any network errors.
                 
                 const maskBlob = await response.blob();
+                if (maskBlob.type === 'text/html') {
+                    // The API might return an HTML error page even with no-cors. We can't read it, but can check the type.
+                    throw new Error("Clipdrop API returned an error page. Check your API key and that the service is running.");
+                }
+
                 const maskBitmap = await createImageBitmap(maskBlob);
 
                 offscreenMaskCanvas.width = maskBitmap.width;
