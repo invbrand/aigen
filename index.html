@@ -248,7 +248,7 @@
 
     <script>
         // --- CONFIGURATION ---
-        const CLIPDROP_API_KEY = "957b940ba584386d8f030ea54ff0e9e94b77f226714031a560405b7ae1f88828c5e6fd886ab7dedaa4b50ecbae81f15b"; // <-- PASTE YOUR API KEY HERE
+        const CLIPDROP_API_KEY = "USEAPIHERECAIO"; // <-- PASTE YOUR API KEY HERE
 
         const BRAND_COLORS_CONFIG = [
             { name: "White", hex: "#FFFFFF" }, { name: "Black", hex: "#0F0F0F" },
@@ -545,6 +545,7 @@
 
                 case 'colorMatch':
                 default:
+                    // Return the original, unaltered image data for color matching
                     return offscreenImageCtx.getImageData(0, 0, offscreenImageCanvas.width, offscreenImageCanvas.height);
             }
         }
