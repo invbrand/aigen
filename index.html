@@ -248,7 +248,7 @@
 
     <script>
         // --- CONFIGURATION ---
-        const CLIPDROP_API_KEY = "957b940ba584386d8f030ea54ff0e9e94b77f226714031a560405b7ae1f88828c5e6fd886ab7dedaa4b50ecbae81f15b"; // <-- PASTE YOUR API KEY HERE
+        const CLIPDROP_API_KEY = "USEAPIHERECAIO"; // <-- PASTE YOUR API KEY HERE
 
         const BRAND_COLORS_CONFIG = [
             { name: "White", hex: "#FFFFFF" }, { name: "Black", hex: "#0F0F0F" },
@@ -752,7 +752,7 @@
         }
 
         async function fetchForegroundMask() {
-            const apiKey = CLIPDROP_API_KEY; // Use the constant
+            const apiKey = CLIPDROP_API_KEY;
             if (!apiKey || apiKey === "USEAPIHERECAIO") {
                 alert('API key is missing. Please add it to the script.');
                 return false;
@@ -771,32 +771,26 @@
                     method: 'POST',
                     headers: { 'x-api-key': apiKey },
                     body: formData,
-                    // FIX: Add mode: 'no-cors' to bypass browser CORS restrictions for this specific API.
-                    // This is a workaround for when the server doesn't send the right CORS headers.
-                    mode: 'no-cors' 
                 });
 
-                // With no-cors, we can't check response.ok, as the response is opaque.
-                // We have to assume it will succeed and let the blob() call handle any network errors.
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Clipdrop API Error (${response.status}): ${errorText}`);
+                }
                 
                 const maskBlob = await response.blob();
-                if (maskBlob.type === 'text/html') {
-                    // The API might return an HTML error page even with no-cors. We can't read it, but can check the type.
-                    throw new Error("Clipdrop API returned an error page. Check your API key and that the service is running.");
-                }
-
                 const maskBitmap = await createImageBitmap(maskBlob);
 
                 offscreenMaskCanvas.width = maskBitmap.width;
                 offscreenMaskCanvas.height = maskBitmap.height;
                 offscreenMaskCtx.drawImage(maskBitmap, 0, 0);
                 
-                return true; // Success
+                return true;
 
             } catch (error) {
                 console.error('Error fetching foreground mask:', error);
                 alert(`Failed to get mask from Clipdrop API. ${error.message}`);
-                return false; // Failure
+                return false;
             } finally {
                  generateButton.disabled = false;
                  generateButton.textContent = "GENERATE & DOWNLOAD";
