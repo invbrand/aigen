@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BRAND IMAGE PATTERN GENERATOR - V2 with Clipdrop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Roboto Mono', monospace;
+            overscroll-behavior: none;
+            background-color: #f0f2f5;
+        }
+        .main-container {
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            margin: 1rem auto;
+            max-width: 1200px;
+        }
+        .header-title { color: #000000; font-weight: 600; }
+        .header-subtitle { color: #6b7280; font-size: 0.875rem; }
+        .action-button {
+            background-color: #1f2937;
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.25rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+            letter-spacing: 0.05em;
+            transition: background-color 0.2s;
+            text-transform: uppercase;
+        }
+        .action-button:hover { background-color: #374151; }
+        .action-button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+        .control-group label.control-label {
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            display: block;
+            font-size: 0.75rem;
+            color: #000000;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .control-group .slider-value-label {
+            font-size: 0.75rem; color: #4b5563;
+        }
+        .slider {
+            -webkit-appearance: none; width: 100%; height: 4px;
+            border-radius: 2px; background: #d1d5db;
+            outline: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #000000;
+            cursor: pointer; border: none;
+        }
+        .slider::-moz-range-thumb {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #000000; cursor: pointer; border: none;
+        }
+
+        .colors-section { margin-top: 1.5rem; }
+        .color-picker-label {
+            font-weight: 500; font-size: 0.75rem; color: #000000;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            margin-right: 0.75rem;
+        }
+        .picker-group {
+            display: flex; flex-wrap: wrap; gap: 0.25rem;
+            align-items: center;
+        }
+        .picker-group input[type="radio"] {
+            opacity: 0; position: absolute; width: 0; height: 0;
+        }
+        .radio-label.color-radio {
+            display: flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px;
+            border: 1px solid transparent;
+            border-radius: 0.125rem;
+            cursor: pointer; transition: all 0.2s;
+            padding: 0;
+        }
+        .radio-input:checked + .radio-label.color-radio {
+            box-shadow: 0 0 0 2px #000000;
+        }
+        .color-swatch {
+            width: 100%; height: 100%; border-radius: 0.125rem;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .preview-container {
+            border: 1px solid #e5e7eb;
+            background-color: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            aspect-ratio: var(--image-aspect-ratio, 1/1);
+            width: 100%;
+            min-height: 300px; /* Ensure a minimum height */
+        }
+        
+        #imagePreview, #patternPreviewCanvas {
+            position: absolute;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .select-input, .text-input {
+            width: 100%; padding: 0.3rem 0.5rem; border: 1px solid #d1d5db;
+            border-radius: 0.25rem; font-size: 0.8rem; background-color: #fff;
+        }
+        .select-input {
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat; background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+
+        .color-match-picker {
+            width: 36px; height: 36px; padding: 2px; border: 1px solid #d1d5db;
+            border-radius: 0.25rem; cursor: pointer;
+        }
+         .radio-label.text-button-label {
+            padding: 4px 10px; border: 1px solid black;
+            background-color: white; color: black; text-transform: uppercase;
+            font-size: 0.75rem;
+            cursor: pointer; white-space: nowrap; text-align: center;
+        }
+        .radio-input:checked + .radio-label.text-button-label {
+            background-color: black; color: white;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="p-4 sm:p-6 md:p-10">
+    <div class="main-container">
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-xl md:text-2xl font-semibold header-title">BRAND IMAGE PATTERN GENERATOR</h1>
+                <p class="text-xs header-subtitle">UPLOAD AN IMAGE AND CUSTOMIZE THE PATTERN.</p>
+            </div>
+            <button id="uploadTriggerButton" class="action-button">UPLOAD</button>
+            <input type="file" id="imageUploadInput" class="hidden" accept="image/*">
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- Controls Column -->
+            <div class="lg:w-[320px] lg:flex-none space-y-6">
+                <div class="grid grid-cols-1 gap-y-5">
+                     <div class="control-group">
+                        <label for="patternDensitySlider" class="control-label">SHAPE DENSITY <span id="patternDensityValue" class="slider-value-label">(170)</span></label>
+                        <input type="range" id="patternDensitySlider" min="10" max="200" value="170" class="slider w-full">
+                    </div>
+                    <div class="control-group">
+                        <label for="randomnessSlider" class="control-label">SHAPE MIX <span id="randomnessValue" class="slider-value-label">(0.50)</span></label>
+                        <input type="range" id="randomnessSlider" min="0" max="1" value="0.5" step="0.01" class="slider w-full">
+                    </div>
+                     <div class="control-group">
+                        <label for="analysisModeSelect" class="control-label">Analysis Mode</label>
+                        <select id="analysisModeSelect" class="select-input">
+                            <option value="luminance" selected>Luma Sensitivity</option>
+                            <option value="colorMatch">Color Match</option>
+                            <option value="edgeDetection">Edge Detection</option>
+                            <option value="foregroundMask">Foreground Mask (AI)</option>
+                        </select>
+                    </div>
+                     <div class="control-group flex items-center justify-between">
+                        <label for="invertToggle" class="control-label !mb-0">INVERT ANALYSIS</label>
+                        <input type="checkbox" id="invertToggle" class="h-4 w-4 text-black border-gray-400 rounded focus:ring-black" style="accent-color: #000000;" />
+                    </div>
+
+                    <div id="luminanceControl" class="control-group">
+                        <label for="brightnessThresholdSlider" class="control-label">RELATIVE SENSITIVITY <span id="brightnessThresholdValue" class="slider-value-label">(80%)</span></label>
+                        <input type="range" id="brightnessThresholdSlider" min="-100" max="200" value="80" step="1" class="slider w-full">
+                    </div>
+                    
+                    <div id="colorMatchControl" class="control-group hidden">
+                        <label for="colorMatchThresholdSlider" class="control-label">COLOR THRESHOLD <span id="colorMatchThresholdValue" class="slider-value-label">(50)</span></label>
+                        <div class="flex items-center gap-4">
+                            <input type="range" id="colorMatchThresholdSlider" min="1" max="150" value="50" class="slider w-full">
+                            <input type="color" id="colorMatchColorPicker" value="#DCF56B" class="color-match-picker">
+                        </div>
+                    </div>
+                    
+                    <hr/>
+                     <div class="control-group">
+                        <label for="minShapeScaleSlider" class="control-label">MIN SHAPE SIZE <span id="minShapeScaleValue" class="slider-value-label">(0.01)</span></label>
+                        <input type="range" id="minShapeScaleSlider" min="0.01" max="1.0" value="0.01" step="0.01" class="slider w-full">
+                    </div>
+                    <div class="control-group">
+                        <label for="maxShapeScaleSlider" class="control-label">MAX SHAPE SIZE <span id="maxShapeScaleValue" class="slider-value-label">(0.90)</span></label>
+                        <input type="range" id="maxShapeScaleSlider" min="0.01" max="1.0" value="0.90" step="0.01" class="slider w-full">
+                    </div>
+                </div>
+
+                <div class="colors-section pt-2">
+                    <span class="group-label font-bold text-xs uppercase">COLORS</span>
+                     <div class="flex flex-col space-y-3 mt-2">
+                        <div class="flex items-center">
+                            <span class="color-picker-label w-28 flex-shrink-0">SHAPE</span>
+                            <div id="shapeColorPickerContainer" class="picker-group"></div>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="color-picker-label w-28 flex-shrink-0">BACKGROUND</span>
+                            <div id="bgColorPickerContainer" class="picker-group"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group pt-4">
+                     <label class="control-label">DOWNLOAD RESOLUTION</label>
+                     <div id="downloadResolutionPickerContainer" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <button id="generateButton" class="action-button w-full !mt-8 !py-3">GENERATE & DOWNLOAD</button>
+            </div>
+
+            <!-- Previews Column -->
+            <div class="flex-1 flex flex-col gap-4">
+                 <div class="flex flex-col items-center">
+                    <p class="text-xs text-gray-500 uppercase mb-2">Original Image</p>
+                    <div id="dropZone" class="preview-container cursor-pointer">
+                        <img id="imagePreview" src="#" alt="Upload area" class="hidden"/>
+                        <div id="dropZoneContent" class="text-center text-gray-400 text-sm p-4">
+                             <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                             <p class="mt-2 font-semibold">CLICK OR DRAG IMAGE HERE</p>
+                        </div>
+                    </div>
+                 </div>
+                 <div class="flex flex-col items-center">
+                     <p class="text-xs text-gray-500 uppercase mb-2">Pattern Preview</p>
+                     <div id="patternPreviewContainer" class="preview-container">
+                        <canvas id="patternPreviewCanvas"></canvas>
+                     </div>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const CLIPDROP_API_KEY = "USEAPIHERECAIO"; // <-- PASTE YOUR API KEY HERE
+
+        const BRAND_COLORS_CONFIG = [
+            { name: "White", hex: "#FFFFFF" }, { name: "Black", hex: "#0F0F0F" },
+            { name: "Midnight Blue", hex: "#24248E" }, { name: "Optimist Blue", hex: "#0C76FE" },
+            { name: "Tech Yellow", hex: "#DCF56B" }, { name: "Wheat", hex: "#E3CFA8" },
+            { name: "Sky Blue", hex: "#BEDAE2" }, { name: "Orchid", hex: "#E57DE1" },
+            { name: "Maroon", hex: "#65211A" }
+        ];
+        const GRAYSCALE_COLORS_CONFIG = Array.from({ length: 11 }, (_, i) => {
+            const percentage = i * 10;
+            const hexValue = Math.round(255 - (percentage / 100) * 255).toString(16).padStart(2, '0');
+            const hex = `#${hexValue}${hexValue}${hexValue}`;
+            return { name: `Gray ${100 - percentage}%`, hex: hex };
+        });
+        const DOWNLOAD_RESOLUTIONS_CONFIG = [
+            { name: "HD", value: 1920 }, { name: "2K", value: 2560 },
+            { name: "4K", value: 3840 }, { name: "8K", value: 7680 }
+        ];
+
+        // --- DOM Elements ---
+        const patternDensitySlider = document.getElementById('patternDensitySlider');
+        const patternDensityValueDisplay = document.getElementById('patternDensityValue');
+        const randomnessSlider = document.getElementById('randomnessSlider');
+        const randomnessValueDisplay = document.getElementById('randomnessValue');
+        const minShapeScaleSlider = document.getElementById('minShapeScaleSlider');
+        const minShapeScaleValueDisplay = document.getElementById('minShapeScaleValue');
+        const maxShapeScaleSlider = document.getElementById('maxShapeScaleSlider');
+        const maxShapeScaleValueDisplay = document.getElementById('maxShapeScaleValue');
+        const invertToggle = document.getElementById('invertToggle');
+        
+        const analysisModeSelect = document.getElementById('analysisModeSelect');
+        const luminanceControl = document.getElementById('luminanceControl');
+        const brightnessThresholdSlider = document.getElementById('brightnessThresholdSlider');
+        const brightnessThresholdValueDisplay = document.getElementById('brightnessThresholdValue');
+        const colorMatchControl = document.getElementById('colorMatchControl');
+        const colorMatchThresholdSlider = document.getElementById('colorMatchThresholdSlider');
+        const colorMatchThresholdValue = document.getElementById('colorMatchThresholdValue');
+        const colorMatchColorPicker = document.getElementById('colorMatchColorPicker');
+
+        const bgColorPickerContainer = document.getElementById('bgColorPickerContainer');
+        const shapeColorPickerContainer = document.getElementById('shapeColorPickerContainer');
+        const downloadResolutionPickerContainer = document.getElementById('downloadResolutionPickerContainer');
+        
+        const imageUploadInput = document.getElementById('imageUploadInput');
+        const uploadTriggerButton = document.getElementById('uploadTriggerButton');
+        const dropZone = document.getElementById('dropZone');
+        const dropZoneContent = document.getElementById('dropZoneContent');
+        const imagePreview = document.getElementById('imagePreview');
+        const patternPreviewCanvas = document.getElementById('patternPreviewCanvas');
+        const patternPreviewCtx = patternPreviewCanvas.getContext('2d');
+        const generateButton = document.getElementById('generateButton');
+        
+        let originalImage = null;
+        let imageAspectRatio = 1;
+        let offscreenImageCanvas = document.createElement('canvas');
+        let offscreenImageCtx = offscreenImageCanvas.getContext('2d', { willReadFrequently: true });
+        let offscreenMaskCanvas = document.createElement('canvas');
+        let offscreenMaskCtx = offscreenMaskCanvas.getContext('2d', { willReadFrequently: true });
+
+        // --- Initialization ---
+        function initialize() {
+            populateColorPickers();
+            populateResolutionPicker();
+            addEventListeners();
+            updateSliderValueDisplays();
+            updatePreviewPanes();
+        }
+
+        function addEventListeners() {
+            const sliders = [patternDensitySlider, randomnessSlider, brightnessThresholdSlider, minShapeScaleSlider, maxShapeScaleSlider, colorMatchThresholdSlider];
+            sliders.forEach(slider => {
+                slider.addEventListener('input', () => {
+                    updateSliderValueDisplays();
+                    if (slider === minShapeScaleSlider || slider === maxShapeScaleSlider) {
+                         enforceMinMaxScaleLogic.call(slider);
+                    }
+                    generatePatternForDisplay();
+                });
+            });
+
+            invertToggle.addEventListener('change', generatePatternForDisplay);
+            analysisModeSelect.addEventListener('change', handleAnalysisModeChange);
+            colorMatchColorPicker.addEventListener('input', generatePatternForDisplay);
+
+            uploadTriggerButton.addEventListener('click', () => imageUploadInput.click());
+            dropZone.addEventListener('click', () => imageUploadInput.click());
+            imageUploadInput.addEventListener('change', handleImageUpload);
+            
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); dropZone.style.borderColor = '#3b82f6'; });
+            dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); dropZone.style.borderColor = '#e5e7eb'; });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                dropZone.style.borderColor = '#e5e7eb';
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    loadImageFromFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            generateButton.addEventListener('click', handleDownload);
+        }
+
+        // --- UI Population ---
+        function populateColorPickers() {
+            const allColors = [...GRAYSCALE_COLORS_CONFIG, ...BRAND_COLORS_CONFIG];
+            allColors.forEach(color => {
+                createRadioOption(shapeColorPickerContainer, 'shapeColor', color, color.hex === '#0F0F0F', 'visualSwatch');
+                createRadioOption(bgColorPickerContainer, 'backgroundColor', color, color.hex === '#FFFFFF', 'visualSwatch');
+            });
+        }
+        
+        function populateResolutionPicker() {
+            DOWNLOAD_RESOLUTIONS_CONFIG.forEach((res, index) => {
+                createRadioOption(downloadResolutionPickerContainer, 'downloadResolution', res, index === 2, 'textButton'); // Default 4K
+            });
+        }
+
+        function createRadioOption(container, name, optionData, isChecked, type) {
+            const radioId = `${name}_${optionData.hex || optionData.value}`;
+            const radioInput = document.createElement('input');
+            radioInput.type = 'radio';
+            radioInput.id = radioId;
+            radioInput.name = name;
+            radioInput.value = optionData.hex || optionData.value;
+            radioInput.className = 'radio-input';
+            if (isChecked) radioInput.checked = true;
+
+            const radioLabel = document.createElement('label');
+            radioLabel.htmlFor = radioId;
+
+            if (type === 'visualSwatch') {
+                radioLabel.className = 'radio-label color-radio';
+                radioLabel.innerHTML = `<span class="color-swatch" style="background-color:${optionData.hex};" title="${optionData.name}"></span>`;
+                radioInput.addEventListener('change', generatePatternForDisplay);
+            } else if (type === 'textButton') {
+                radioLabel.className = 'radio-label text-button-label';
+                radioLabel.textContent = optionData.name;
+            }
+            container.appendChild(radioInput);
+            container.appendChild(radioLabel);
+        }
+        
+        // --- Event Handlers ---
+        function handleImageUpload(event) {
+            if (event.target.files && event.target.files[0]) {
+                loadImageFromFile(event.target.files[0]);
+            }
+        }
+
+        function loadImageFromFile(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                originalImage = new Image();
+                originalImage.onload = () => {
+                    imageAspectRatio = originalImage.width / originalImage.height;
+                    offscreenImageCanvas.width = originalImage.width;
+                    offscreenImageCanvas.height = originalImage.height;
+                    offscreenImageCtx.drawImage(originalImage, 0, 0);
+
+                    // Clear any previous mask
+                    offscreenMaskCanvas.width = 0; 
+                    offscreenMaskCanvas.height = 0;
+
+                    updatePreviewPanes(e.target.result);
+                    generatePatternForDisplay();
+                };
+                originalImage.onerror = () => alert("Error: Could not process the image file.");
+                originalImage.src = e.target.result;
+            };
+            reader.onerror = () => alert("Error: Could not read the file.");
+            reader.readAsDataURL(file);
+        }
+        
+        function handleAnalysisModeChange() {
+            const mode = analysisModeSelect.value;
+            luminanceControl.classList.toggle('hidden', mode !== 'luminance' && mode !== 'edgeDetection');
+            colorMatchControl.classList.toggle('hidden', mode !== 'colorMatch');
+            
+            const lumaLabel = luminanceControl.querySelector('label');
+
+            if (mode === 'edgeDetection') {
+                lumaLabel.firstChild.textContent = 'EDGE SENSITIVITY';
+                brightnessThresholdSlider.min = 0;
+                brightnessThresholdSlider.max = 255;
+                brightnessThresholdSlider.value = 128;
+            } else if (mode === 'luminance') {
+                lumaLabel.firstChild.textContent = 'RELATIVE SENSITIVITY';
+                brightnessThresholdSlider.min = -100;
+                brightnessThresholdSlider.max = 200;
+                brightnessThresholdSlider.value = 0;
+            }
+            updateSliderValueDisplays();
+            generatePatternForDisplay();
+        }
+
+        async function handleDownload() {
+            if (!originalImage) {
+                alert("Please upload an image first.");
+                return;
+            }
+
+            if (analysisModeSelect.value === 'foregroundMask') {
+                const success = await fetchForegroundMask();
+                if (!success) {
+                    return; // Stop if API call fails
+                }
+            }
+            
+            const selectedResolution = parseInt(getSelectedRadioValue('downloadResolution'));
+            const downloadCanvas = document.createElement('canvas');
+            const downloadCtx = downloadCanvas.getContext('2d');
+            
+            generatePatternOnCanvas(downloadCanvas, downloadCtx, true, selectedResolution);
+            
+            const dataURL = downloadCanvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `pattern-export-${downloadCanvas.width}x${downloadCanvas.height}.png`;
+            link.href = dataURL;
+            link.click();
+        }
+
+        // --- UI Updates & Logic ---
+        function updateSliderValueDisplays() {
+            patternDensityValueDisplay.textContent = `(${patternDensitySlider.value})`;
+            randomnessValueDisplay.textContent = `(${parseFloat(randomnessSlider.value).toFixed(2)})`;
+            
+            const mode = analysisModeSelect.value;
+            const brightnessValue = parseInt(brightnessThresholdSlider.value);
+            if (mode === 'luminance') {
+                brightnessThresholdValueDisplay.textContent = `(${brightnessValue > 0 ? '+' : ''}${brightnessValue}%)`;
+            } else { // edgeDetection
+                 brightnessThresholdValueDisplay.textContent = `(${brightnessValue})`;
+            }
+            
+            minShapeScaleValueDisplay.textContent = `(${parseFloat(minShapeScaleSlider.value).toFixed(2)})`;
+            maxShapeScaleValueDisplay.textContent = `(${parseFloat(maxShapeScaleSlider.value).toFixed(2)})`;
+            colorMatchThresholdValue.textContent = `(${colorMatchThresholdSlider.value})`;
+        }
+        
+        function enforceMinMaxScaleLogic() {
+            let minVal = parseFloat(minShapeScaleSlider.value);
+            let maxVal = parseFloat(maxShapeScaleSlider.value);
+            if (minVal > maxVal) {
+                if (this === minShapeScaleSlider) maxShapeScaleSlider.value = maxVal;
+                else minShapeScaleSlider.value = minVal;
+            }
+        }
+
+        function updatePreviewPanes(imageSrc = null) {
+            const aspectRatioCSS = `${imageAspectRatio}`;
+            dropZone.style.setProperty('--image-aspect-ratio', aspectRatioCSS);
+            document.getElementById('patternPreviewContainer').style.setProperty('--image-aspect-ratio', aspectRatioCSS);
+            
+            if (imageSrc) {
+                imagePreview.src = imageSrc;
+                imagePreview.classList.remove('hidden');
+                dropZoneContent.classList.add('hidden');
+            } else {
+                 imagePreview.classList.add('hidden');
+                 dropZoneContent.classList.remove('hidden');
+                 generatePatternForDisplay();
+            }
+        }
+        
+        function getSelectedRadioValue(name) {
+            const selected = document.querySelector(`input[name="${name}"]:checked`);
+            return selected ? selected.value : null;
+        }
+
+        // --- Core Drawing Logic ---
+        function getAnalysisData() {
+            const analysisMode = analysisModeSelect.value;
+            let tempCtx;
+
+            switch(analysisMode) {
+                case 'luminance':
+                    tempCtx = document.createElement('canvas').getContext('2d');
+                    tempCtx.canvas.width = originalImage.width;
+                    tempCtx.canvas.height = originalImage.height;
+                    equalizeHistogram(tempCtx);
+                    return tempCtx.getImageData(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
+                
+                case 'edgeDetection':
+                    tempCtx = document.createElement('canvas').getContext('2d');
+                    tempCtx.canvas.width = originalImage.width;
+                    tempCtx.canvas.height = originalImage.height;
+                    applySobelFilter(tempCtx);
+                    return tempCtx.getImageData(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
+
+                case 'foregroundMask':
+                    if (offscreenMaskCanvas.width > 0) {
+                        return offscreenMaskCtx.getImageData(0, 0, offscreenMaskCanvas.width, offscreenMaskCanvas.height);
+                    }
+                    return null; // Mask not ready
+
+                case 'colorMatch':
+                default:
+                    return offscreenImageCtx.getImageData(0, 0, offscreenImageCanvas.width, offscreenImageCanvas.height);
+            }
+        }
+        
+        function equalizeHistogram(ctx) {
+            ctx.drawImage(originalImage, 0, 0);
+            const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+            const data = imageData.data;
+            const hist = new Array(256).fill(0);
+            for (let i = 0; i < data.length; i += 4) {
+                hist[Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2])]++;
+            }
+            const cdf = new Array(256).fill(0);
+            cdf[0] = hist[0];
+            for (let i = 1; i < 256; i++) {
+                cdf[i] = cdf[i - 1] + hist[i];
+            }
+            let cdfMin = 0;
+            for (let i = 0; i < 256; i++) {
+                if (cdf[i] > 0) {
+                    cdfMin = cdf[i];
+                    break;
+                }
+            }
+            const lut = new Array(256);
+            const numPixels = data.length / 4;
+            for (let i = 0; i < 256; i++) {
+                lut[i] = Math.round(255 * (cdf[i] - cdfMin) / (numPixels - cdfMin));
+            }
+            for (let i = 0; i < data.length; i += 4) {
+                const luma = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                const newLuma = lut[luma];
+                data[i] = newLuma;
+                data[i + 1] = newLuma;
+                data[i + 2] = newLuma;
+            }
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function applySobelFilter(ctx) {
+            // A simple Sobel filter implementation for edge detection
+            ctx.drawImage(originalImage, 0, 0);
+            const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+            const grayscaleData = new Uint8ClampedArray(imageData.width * imageData.height);
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                const luma = 0.299 * imageData.data[i] + 0.587 * imageData.data[i + 1] + 0.114 * imageData.data[i + 2];
+                grayscaleData[i / 4] = luma;
+            }
+
+            const sobelData = new Uint8ClampedArray(imageData.width * imageData.height * 4);
+            const sobelX = [
+                [-1, 0, 1],
+                [-2, 0, 2],
+                [-1, 0, 1]
+            ];
+            const sobelY = [
+                [-1, -2, -1],
+                [0, 0, 0],
+                [1, 2, 1]
+            ];
+
+            for (let y = 1; y < imageData.height - 1; y++) {
+                for (let x = 1; x < imageData.width - 1; x++) {
+                    let pixelX = 0;
+                    let pixelY = 0;
+                    for (let j = -1; j <= 1; j++) {
+                        for (let i = -1; i <= 1; i++) {
+                            const pixel = grayscaleData[(y + j) * imageData.width + (x + i)];
+                            pixelX += pixel * sobelX[j + 1][i + 1];
+                            pixelY += pixel * sobelY[j + 1][i + 1];
+                        }
+                    }
+                    const magnitude = Math.sqrt(pixelX * pixelX + pixelY * pixelY) >>> 0;
+                    const index = (y * imageData.width + x) * 4;
+                    sobelData[index] = magnitude;
+                    sobelData[index + 1] = magnitude;
+                    sobelData[index + 2] = magnitude;
+                    sobelData[index + 3] = 255;
+                }
+            }
+            ctx.putImageData(new ImageData(sobelData, imageData.width, imageData.height), 0, 0);
+        }
+
+        function generatePatternForDisplay() {
+            generatePatternOnCanvas(patternPreviewCanvas, patternPreviewCtx, false);
+        }
+
+        function generatePatternOnCanvas(canvas, ctx, isForDownload = false, downloadMaxDim = 0) {
+            let canvasWidth, canvasHeight;
+            let currentAspectRatio = originalImage ? imageAspectRatio : 1;
+
+            if (isForDownload) {
+                if (currentAspectRatio >= 1) { canvasWidth = downloadMaxDim; canvasHeight = downloadMaxDim / currentAspectRatio; } 
+                else { canvasHeight = downloadMaxDim; canvasWidth = downloadMaxDim * currentAspectRatio; }
+            } else {
+                const containerRect = canvas.parentElement.getBoundingClientRect();
+                 if (containerRect.width / containerRect.height > currentAspectRatio) {
+                    canvasHeight = containerRect.height;
+                    canvasWidth = canvasHeight * currentAspectRatio;
+                } else {
+                    canvasWidth = containerRect.width;
+                    canvasHeight = canvasWidth / currentAspectRatio;
+                }
+            }
+            canvas.width = Math.round(canvasWidth);
+            canvas.height = Math.round(canvasHeight);
+
+            const bgColor = getSelectedRadioValue('backgroundColor');
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!originalImage) {
+                ctx.fillStyle = "#9ca3af";
+                ctx.font = "14px 'Roboto Mono'";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("Pattern Preview", canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            const analysisImageData = getAnalysisData();
+            if (!analysisImageData) {
+                 if (analysisModeSelect.value === 'foregroundMask') {
+                    ctx.fillStyle = "#9ca3af";
+                    ctx.font = "14px 'Roboto Mono'";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText("Generate to get AI Mask", canvas.width / 2, canvas.height / 2);
+                 }
+                return;
+            }
+
+            const data = analysisImageData.data;
+            const sourceWidth = analysisImageData.width;
+            
+            const density = parseInt(patternDensitySlider.value);
+            const randomness = parseFloat(randomnessSlider.value);
+            const minScale = parseFloat(minShapeScaleSlider.value);
+            const maxScale = parseFloat(maxShapeScaleSlider.value);
+            const invert = invertToggle.checked;
+            const analysisMode = analysisModeSelect.value;
+            const shapeColor = getSelectedRadioValue('shapeColor');
+            ctx.fillStyle = shapeColor;
+            
+            const gridCols = density;
+            const gridRows = Math.round(density / currentAspectRatio);
+            const cellWidth = canvas.width / gridCols;
+            const cellHeight = canvas.height / gridRows;
+
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    const sampleX = Math.floor((col + 0.5) / gridCols * sourceWidth);
+                    const sampleY = Math.floor((row + 0.5) / gridRows * sourceWidth / currentAspectRatio);
+                    const pixelIndex = (sampleY * sourceWidth + sampleX) * 4;
+                    
+                    let strengthFactor = 0;
+
+                    switch (analysisMode) {
+                        case 'luminance': {
+                             const brightness = data[pixelIndex]; 
+                            const relativeSensitivity = parseInt(brightnessThresholdSlider.value);
+                            const sensitivityMultiplier = 1.0 + (relativeSensitivity / 100.0);
+                             const baseStrength = invert ? (brightness / 255.0) : ((255.0 - brightness) / 255.0);
+                            strengthFactor = Math.pow(baseStrength, 1/sensitivityMultiplier);
+                            break;
+                        }
+                        case 'colorMatch': {
+                            const targetColor = hexToRgb(colorMatchColorPicker.value);
+                            const threshold = parseInt(colorMatchThresholdSlider.value);
+                            if(targetColor) {
+                                const r = data[pixelIndex], g = data[pixelIndex+1], b = data[pixelIndex+2];
+                                const dist = Math.sqrt(Math.pow(r-targetColor.r,2)+Math.pow(g-targetColor.g,2)+Math.pow(b-targetColor.b,2));
+                                strengthFactor = Math.max(0, 1 - (dist / threshold));
+                                if(invert) strengthFactor = 1 - strengthFactor;
+                            }
+                            break;
+                        }
+                        case 'edgeDetection': {
+                            const brightness = data[pixelIndex];
+                            const threshold = parseInt(brightnessThresholdSlider.value);
+                            strengthFactor = brightness > threshold ? 1 : 0;
+                            if (invert) strengthFactor = 1 - strengthFactor;
+                            break;
+                        }
+                        case 'foregroundMask': {
+                            const brightness = data[pixelIndex];
+                            strengthFactor = brightness / 255;
+                            if (invert) strengthFactor = 1 - strengthFactor;
+                            break;
+                        }
+                    }
+
+                    if (strengthFactor > 0.1) { // Threshold to draw
+                        strengthFactor = Math.max(0, Math.min(1, strengthFactor));
+                        const scale = minScale + strengthFactor * (maxScale - minScale);
+                        const shapeSize = Math.min(cellWidth, cellHeight) * scale;
+                        const centerX = (col + 0.5) * cellWidth;
+                        const centerY = (row + 0.5) * cellHeight;
+                        const isCircle = Math.random() < randomness;
+                        drawShape(ctx, centerX, centerY, shapeSize, isCircle);
+                    }
+                }
+            }
+        }
+
+        async function fetchForegroundMask() {
+            const apiKey = CLIPDROP_API_KEY; // Use the constant
+            if (!apiKey || apiKey === "USEAPIHERECAIO") {
+                alert('API key is missing. Please add it to the script.');
+                return false;
+            }
+
+            generateButton.disabled = true;
+            generateButton.textContent = "Getting AI Mask...";
+            
+            const blob = await new Promise(resolve => offscreenImageCanvas.toBlob(resolve, 'image/png'));
+            
+            const formData = new FormData();
+            formData.append('image_file', blob, 'source.png');
+
+            try {
+                const response = await fetch('https://clipdrop-api.co/segmentation/v1', {
+                    method: 'POST',
+                    headers: { 'x-api-key': apiKey },
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Clipdrop API Error: ${response.statusText}`);
+                }
+                
+                const maskBlob = await response.blob();
+                const maskBitmap = await createImageBitmap(maskBlob);
+
+                offscreenMaskCanvas.width = maskBitmap.width;
+                offscreenMaskCanvas.height = maskBitmap.height;
+                offscreenMaskCtx.drawImage(maskBitmap, 0, 0);
+                
+                return true; // Success
+
+            } catch (error) {
+                console.error('Error fetching foreground mask:', error);
+                alert(`Failed to get mask from Clipdrop API. ${error.message}`);
+                return false; // Failure
+            } finally {
+                 generateButton.disabled = false;
+                 generateButton.textContent = "GENERATE & DOWNLOAD";
+            }
+        }
+        
+        function drawShape(ctx, x, y, size, isCircle) {
+            ctx.beginPath();
+            if (isCircle) {
+                ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+            } else {
+                const side = size * 0.75;
+                ctx.rect(x - side / 2, y - side / 2, side, side);
+            }
+            ctx.fill();
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+        }
+
+        document.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>
