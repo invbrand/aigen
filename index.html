@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BRAND IMAGE PATTERN GENERATOR - V2 with Clipdrop</title>
+    <title>BRAND IMAGE PATTERN GENERATOR - V3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -122,7 +122,6 @@
             background-repeat: no-repeat; background-size: 1.5em 1.5em;
             padding-right: 2.5rem;
         }
-
         .color-match-picker {
             width: 36px; height: 36px; padding: 2px; border: 1px solid #d1d5db;
             border-radius: 0.25rem; cursor: pointer;
@@ -168,9 +167,10 @@
                         <label for="analysisModeSelect" class="control-label">Analysis Mode</label>
                         <select id="analysisModeSelect" class="select-input">
                             <option value="luminance" selected>Luma Sensitivity</option>
+                            <option value="hslAnalysis">HSL (Lightness)</option>
+                            <option value="colorDissimilarity">Texture (Color Variation)</option>
                             <option value="colorMatch">Color Match</option>
                             <option value="edgeDetection">Edge Detection</option>
-                            <option value="foregroundMask">Foreground Mask (AI)</option>
                         </select>
                     </div>
                      <div class="control-group flex items-center justify-between">
@@ -182,6 +182,11 @@
                         <label for="brightnessThresholdSlider" class="control-label">RELATIVE SENSITIVITY <span id="brightnessThresholdValue" class="slider-value-label">(80%)</span></label>
                         <input type="range" id="brightnessThresholdSlider" min="-100" max="200" value="80" step="1" class="slider w-full">
                     </div>
+
+                    <div id="hslContrastControl" class="control-group hidden">
+                        <label for="hslContrastSlider" class="control-label">CONTRAST <span id="hslContrastValue" class="slider-value-label">(x1.0)</span></label>
+                        <input type="range" id="hslContrastSlider" min="0.1" max="5.0" value="1.0" step="0.1" class="slider w-full">
+                    </div>
                     
                     <div id="colorMatchControl" class="control-group hidden">
                         <label for="colorMatchThresholdSlider" class="control-label">COLOR THRESHOLD <span id="colorMatchThresholdValue" class="slider-value-label">(50)</span></label>
@@ -190,7 +195,16 @@
                             <input type="color" id="colorMatchColorPicker" value="#DCF56B" class="color-match-picker">
                         </div>
                     </div>
-                    
+                    <hr/>
+                    <!-- NEW: Background Removal Section -->
+                     <div class="control-group">
+                        <label for="clipdropApiKey" class="control-label">Clipdrop API Key</label>
+                        <input type="text" id="clipdropApiKey" class="text-input" placeholder="Paste your API key here">
+                    </div>
+                     <div class="control-group flex items-center justify-between">
+                        <label for="removeBackgroundToggle" class="control-label !mb-0">REMOVE BACKGROUND (AI)</label>
+                        <input type="checkbox" id="removeBackgroundToggle" class="h-4 w-4 text-black border-gray-400 rounded focus:ring-black" style="accent-color: #000000;" />
+                    </div>
                     <hr/>
                      <div class="control-group">
                         <label for="minShapeScaleSlider" class="control-label">MIN SHAPE SIZE <span id="minShapeScaleValue" class="slider-value-label">(0.01)</span></label>
@@ -248,8 +262,6 @@
 
     <script>
         // --- CONFIGURATION ---
-        const CLIPDROP_API_KEY = "957b940ba584386d8f030ea54ff0e9e94b77f226714031a560405b7ae1f88828c5e6fd886ab7dedaa4b50ecbae81f15b"; // <-- PASTE YOUR API KEY HERE
-
         const BRAND_COLORS_CONFIG = [
             { name: "White", hex: "#FFFFFF" }, { name: "Black", hex: "#0F0F0F" },
             { name: "Midnight Blue", hex: "#24248E" }, { name: "Optimist Blue", hex: "#0C76FE" },
@@ -283,10 +295,18 @@
         const luminanceControl = document.getElementById('luminanceControl');
         const brightnessThresholdSlider = document.getElementById('brightnessThresholdSlider');
         const brightnessThresholdValueDisplay = document.getElementById('brightnessThresholdValue');
+        
+        const hslContrastControl = document.getElementById('hslContrastControl');
+        const hslContrastSlider = document.getElementById('hslContrastSlider');
+        const hslContrastValue = document.getElementById('hslContrastValue');
+
         const colorMatchControl = document.getElementById('colorMatchControl');
         const colorMatchThresholdSlider = document.getElementById('colorMatchThresholdSlider');
         const colorMatchThresholdValue = document.getElementById('colorMatchThresholdValue');
         const colorMatchColorPicker = document.getElementById('colorMatchColorPicker');
+
+        const clipdropApiKeyInput = document.getElementById('clipdropApiKey');
+        const removeBackgroundToggle = document.getElementById('removeBackgroundToggle');
 
         const bgColorPickerContainer = document.getElementById('bgColorPickerContainer');
         const shapeColorPickerContainer = document.getElementById('shapeColorPickerContainer');
@@ -303,10 +323,11 @@
         
         let originalImage = null;
         let imageAspectRatio = 1;
+        let foregroundMaskData = null; // To store the AI mask
+        // Canvas for grayscale/equalized image processing
         let offscreenImageCanvas = document.createElement('canvas');
         let offscreenImageCtx = offscreenImageCanvas.getContext('2d', { willReadFrequently: true });
-        let offscreenMaskCanvas = document.createElement('canvas');
-        let offscreenMaskCtx = offscreenMaskCanvas.getContext('2d', { willReadFrequently: true });
+        offscreenImageCtx.imageSmoothingEnabled = false;
 
         // --- Initialization ---
         function initialize() {
@@ -318,7 +339,7 @@
         }
 
         function addEventListeners() {
-            const sliders = [patternDensitySlider, randomnessSlider, brightnessThresholdSlider, minShapeScaleSlider, maxShapeScaleSlider, colorMatchThresholdSlider];
+            const sliders = [patternDensitySlider, randomnessSlider, brightnessThresholdSlider, hslContrastSlider, minShapeScaleSlider, maxShapeScaleSlider, colorMatchThresholdSlider];
             sliders.forEach(slider => {
                 slider.addEventListener('input', () => {
                     updateSliderValueDisplays();
@@ -331,6 +352,7 @@
 
             invertToggle.addEventListener('change', generatePatternForDisplay);
             analysisModeSelect.addEventListener('change', handleAnalysisModeChange);
+            removeBackgroundToggle.addEventListener('change', handleRemoveBackgroundToggle);
             colorMatchColorPicker.addEventListener('input', generatePatternForDisplay);
 
             uploadTriggerButton.addEventListener('click', () => imageUploadInput.click());
@@ -405,11 +427,13 @@
                     imageAspectRatio = originalImage.width / originalImage.height;
                     offscreenImageCanvas.width = originalImage.width;
                     offscreenImageCanvas.height = originalImage.height;
-                    offscreenImageCtx.drawImage(originalImage, 0, 0);
+                    
+                    // Reset AI mask on new image upload
+                    foregroundMaskData = null;
+                    removeBackgroundToggle.checked = false;
 
-                    // Clear any previous mask
-                    offscreenMaskCanvas.width = 0; 
-                    offscreenMaskCanvas.height = 0;
+                    // Apply histogram equalization for luminance mode
+                    equalizeHistogram();
 
                     updatePreviewPanes(e.target.result);
                     generatePatternForDisplay();
@@ -420,48 +444,78 @@
             reader.onerror = () => alert("Error: Could not read the file.");
             reader.readAsDataURL(file);
         }
+
+        async function handleRemoveBackgroundToggle() {
+            if (removeBackgroundToggle.checked && !foregroundMaskData && originalImage) {
+                await fetchForegroundMask();
+            }
+            generatePatternForDisplay();
+        }
         
         function handleAnalysisModeChange() {
             const mode = analysisModeSelect.value;
-            luminanceControl.classList.toggle('hidden', mode !== 'luminance' && mode !== 'edgeDetection');
-            colorMatchControl.classList.toggle('hidden', mode !== 'colorMatch');
-            
             const lumaLabel = luminanceControl.querySelector('label');
+            
+            // Hide all special controls first
+            luminanceControl.classList.add('hidden');
+            colorMatchControl.classList.add('hidden');
+            hslContrastControl.classList.add('hidden');
+            
+            // Default to showing the main sensitivity slider
+            luminanceControl.classList.remove('hidden');
 
-            if (mode === 'edgeDetection') {
-                lumaLabel.firstChild.textContent = 'EDGE SENSITIVITY';
-                brightnessThresholdSlider.min = 0;
-                brightnessThresholdSlider.max = 255;
-                brightnessThresholdSlider.value = 128;
-            } else if (mode === 'luminance') {
-                lumaLabel.firstChild.textContent = 'RELATIVE SENSITIVITY';
-                brightnessThresholdSlider.min = -100;
-                brightnessThresholdSlider.max = 200;
-                brightnessThresholdSlider.value = 0;
+            switch(mode) {
+                case 'luminance':
+                    lumaLabel.firstChild.textContent = 'RELATIVE SENSITIVITY';
+                    brightnessThresholdSlider.min = -100;
+                    brightnessThresholdSlider.max = 200;
+                    brightnessThresholdSlider.step = 1;
+                    brightnessThresholdSlider.value = 80;
+                    break;
+                case 'hslAnalysis':
+                    lumaLabel.firstChild.textContent = 'INTENSITY';
+                    brightnessThresholdSlider.min = 0.1;
+                    brightnessThresholdSlider.max = 4.0;
+                    brightnessThresholdSlider.step = 0.05;
+                    brightnessThresholdSlider.value = 1.5;
+                    hslContrastControl.classList.remove('hidden');
+                    break;
+                case 'colorDissimilarity':
+                    lumaLabel.firstChild.textContent = 'TEXTURE SENSITIVITY';
+                    brightnessThresholdSlider.min = 0.1;
+                    brightnessThresholdSlider.max = 20;
+                    brightnessThresholdSlider.step = 0.1;
+                    brightnessThresholdSlider.value = 1;
+                    break;
+                case 'edgeDetection':
+                    lumaLabel.firstChild.textContent = 'EDGE SENSITIVITY';
+                    brightnessThresholdSlider.min = 0;
+                    brightnessThresholdSlider.max = 255;
+                    brightnessThresholdSlider.step = 1;
+                    brightnessThresholdSlider.value = 128;
+                    break;
+                case 'colorMatch':
+                    luminanceControl.classList.add('hidden');
+                    colorMatchControl.classList.remove('hidden');
+                    break;
+                default:
+                     luminanceControl.classList.add('hidden');
+                     break;
             }
+
             updateSliderValueDisplays();
             generatePatternForDisplay();
         }
 
-        async function handleDownload() {
+        function handleDownload() {
             if (!originalImage) {
                 alert("Please upload an image first.");
                 return;
             }
-
-            if (analysisModeSelect.value === 'foregroundMask') {
-                const success = await fetchForegroundMask();
-                if (!success) {
-                    return; // Stop if API call fails
-                }
-            }
-            
             const selectedResolution = parseInt(getSelectedRadioValue('downloadResolution'));
             const downloadCanvas = document.createElement('canvas');
             const downloadCtx = downloadCanvas.getContext('2d');
-            
             generatePatternOnCanvas(downloadCanvas, downloadCtx, true, selectedResolution);
-            
             const dataURL = downloadCanvas.toDataURL('image/png');
             const link = document.createElement('a');
             link.download = `pattern-export-${downloadCanvas.width}x${downloadCanvas.height}.png`;
@@ -475,11 +529,23 @@
             randomnessValueDisplay.textContent = `(${parseFloat(randomnessSlider.value).toFixed(2)})`;
             
             const mode = analysisModeSelect.value;
-            const brightnessValue = parseInt(brightnessThresholdSlider.value);
-            if (mode === 'luminance') {
-                brightnessThresholdValueDisplay.textContent = `(${brightnessValue > 0 ? '+' : ''}${brightnessValue}%)`;
-            } else { // edgeDetection
-                 brightnessThresholdValueDisplay.textContent = `(${brightnessValue})`;
+            const sensitivityValue = parseFloat(brightnessThresholdSlider.value);
+            const contrastValue = parseFloat(hslContrastSlider.value);
+
+            switch(mode) {
+                case 'luminance':
+                    brightnessThresholdValueDisplay.textContent = `(${sensitivityValue > 0 ? '+' : ''}${sensitivityValue}%)`;
+                    break;
+                case 'hslAnalysis':
+                     brightnessThresholdValueDisplay.textContent = `(x${sensitivityValue.toFixed(1)})`;
+                     hslContrastValue.textContent = `(x${contrastValue.toFixed(1)})`;
+                     break;
+                case 'colorDissimilarity':
+                     brightnessThresholdValueDisplay.textContent = `(x${sensitivityValue.toFixed(1)})`;
+                     break;
+                case 'edgeDetection':
+                     brightnessThresholdValueDisplay.textContent = `(${Math.round(sensitivityValue)})`;
+                     break;
             }
             
             minShapeScaleValueDisplay.textContent = `(${parseFloat(minShapeScaleSlider.value).toFixed(2)})`;
@@ -491,7 +557,7 @@
             let minVal = parseFloat(minShapeScaleSlider.value);
             let maxVal = parseFloat(maxShapeScaleSlider.value);
             if (minVal > maxVal) {
-                if (this === minShapeScaleSlider) maxShapeScaleSlider.value = maxVal;
+                if (this === minShapeScaleSlider) maxShapeScaleSlider.value = minVal;
                 else minShapeScaleSlider.value = minVal;
             }
         }
@@ -517,42 +583,75 @@
             return selected ? selected.value : null;
         }
 
-        // --- Core Drawing Logic ---
-        function getAnalysisData() {
-            const analysisMode = analysisModeSelect.value;
-            let tempCtx;
+        // --- HELPER FUNCTIONS ---
 
-            switch(analysisMode) {
-                case 'luminance':
-                    tempCtx = document.createElement('canvas').getContext('2d');
-                    tempCtx.canvas.width = originalImage.width;
-                    tempCtx.canvas.height = originalImage.height;
-                    equalizeHistogram(tempCtx);
-                    return tempCtx.getImageData(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
-                
-                case 'edgeDetection':
-                    tempCtx = document.createElement('canvas').getContext('2d');
-                    tempCtx.canvas.width = originalImage.width;
-                    tempCtx.canvas.height = originalImage.height;
-                    applySobelFilter(tempCtx);
-                    return tempCtx.getImageData(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
-
-                case 'foregroundMask':
-                    if (offscreenMaskCanvas.width > 0) {
-                        return offscreenMaskCtx.getImageData(0, 0, offscreenMaskCanvas.width, offscreenMaskCanvas.height);
-                    }
-                    return null; // Mask not ready
-
-                case 'colorMatch':
-                default:
-                    // Return the original, unaltered image data for color matching
-                    return offscreenImageCtx.getImageData(0, 0, offscreenImageCanvas.width, offscreenImageCanvas.height);
+        function rgbToHsl(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+            if (max === min) { h = s = 0; } 
+            else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
             }
+            return { h, s, l };
+        }
+
+        function calculateColorDistance(r1, g1, b1, r2, g2, b2) {
+            return Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(g1 - g2, 2) + Math.pow(b1 - b2, 2));
+        }
+
+        function createDissimilarityMap(imageData) {
+            const { data, width, height } = imageData;
+            const dissimilarityData = new Uint8ClampedArray(data.length);
+            let maxDistance = 0;
+            const distances = new Float32Array(data.length / 4);
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const centerIndex = (y * width + x) * 4;
+                    let avgR = 0, avgG = 0, avgB = 0;
+                    for (let j = -1; j <= 1; j++) {
+                        for (let i = -1; i <= 1; i++) {
+                            if (i === 0 && j === 0) continue;
+                            const neighborIndex = ((y + j) * width + (x + i)) * 4;
+                            avgR += data[neighborIndex];
+                            avgG += data[neighborIndex + 1];
+                            avgB += data[neighborIndex + 2];
+                        }
+                    }
+                    avgR /= 8; avgG /= 8; avgB /= 8;
+                    const distance = calculateColorDistance(data[centerIndex], data[centerIndex+1], data[centerIndex+2], avgR, avgG, avgB);
+                    const flatIndex = y * width + x;
+                    distances[flatIndex] = distance;
+                    if (distance > maxDistance) maxDistance = distance;
+                }
+            }
+            if (maxDistance === 0) maxDistance = 1;
+            for (let i = 0; i < distances.length; i++) {
+                const normalizedValue = (distances[i] / maxDistance) * 255;
+                const outputIndex = i * 4;
+                dissimilarityData[outputIndex] = normalizedValue;
+                dissimilarityData[outputIndex+1] = normalizedValue;
+                dissimilarityData[outputIndex+2] = normalizedValue;
+                dissimilarityData[outputIndex+3] = 255;
+            }
+            return new ImageData(dissimilarityData, width, height);
         }
         
-        function equalizeHistogram(ctx) {
-            ctx.drawImage(originalImage, 0, 0);
-            const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
+        // --- Core Logic ---
+        function equalizeHistogram() {
+            if (!originalImage) return;
+            const srcCtx = document.createElement('canvas').getContext('2d');
+            srcCtx.canvas.width = originalImage.width;
+            srcCtx.canvas.height = originalImage.height;
+            srcCtx.drawImage(originalImage, 0, 0);
+            const imageData = srcCtx.getImageData(0, 0, srcCtx.canvas.width, srcCtx.canvas.height);
             const data = imageData.data;
             const hist = new Array(256).fill(0);
             for (let i = 0; i < data.length; i += 4) {
@@ -560,73 +659,77 @@
             }
             const cdf = new Array(256).fill(0);
             cdf[0] = hist[0];
-            for (let i = 1; i < 256; i++) {
-                cdf[i] = cdf[i - 1] + hist[i];
-            }
+            for (let i = 1; i < 256; i++) { cdf[i] = cdf[i - 1] + hist[i]; }
             let cdfMin = 0;
-            for (let i = 0; i < 256; i++) {
-                if (cdf[i] > 0) {
-                    cdfMin = cdf[i];
-                    break;
-                }
-            }
+            for (let i = 0; i < 256; i++) { if (cdf[i] > 0) { cdfMin = cdf[i]; break; } }
             const lut = new Array(256);
             const numPixels = data.length / 4;
-            for (let i = 0; i < 256; i++) {
-                lut[i] = Math.round(255 * (cdf[i] - cdfMin) / (numPixels - cdfMin));
-            }
+            for (let i = 0; i < 256; i++) { lut[i] = Math.round(255 * (cdf[i] - cdfMin) / (numPixels - cdfMin)); }
             for (let i = 0; i < data.length; i += 4) {
                 const luma = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
                 const newLuma = lut[luma];
-                data[i] = newLuma;
-                data[i + 1] = newLuma;
-                data[i + 2] = newLuma;
+                data[i] = newLuma; data[i + 1] = newLuma; data[i + 2] = newLuma;
             }
-            ctx.putImageData(imageData, 0, 0);
+            offscreenImageCtx.putImageData(imageData, 0, 0);
         }
 
-        function applySobelFilter(ctx) {
-            // A simple Sobel filter implementation for edge detection
-            ctx.drawImage(originalImage, 0, 0);
-            const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
-            const grayscaleData = new Uint8ClampedArray(imageData.width * imageData.height);
-            for (let i = 0; i < imageData.data.length; i += 4) {
-                const luma = 0.299 * imageData.data[i] + 0.587 * imageData.data[i + 1] + 0.114 * imageData.data[i + 2];
-                grayscaleData[i / 4] = luma;
+        async function fetchForegroundMask() {
+            const apiKey = clipdropApiKeyInput.value;
+            if (!apiKey) {
+                alert('Clipdrop API key is missing. Please add it to the input field.');
+                removeBackgroundToggle.checked = false;
+                return false;
             }
+            const originalButtonText = generateButton.textContent;
+            generateButton.disabled = true;
+            generateButton.textContent = "Getting AI Mask...";
+            removeBackgroundToggle.disabled = true;
 
-            const sobelData = new Uint8ClampedArray(imageData.width * imageData.height * 4);
-            const sobelX = [
-                [-1, 0, 1],
-                [-2, 0, 2],
-                [-1, 0, 1]
-            ];
-            const sobelY = [
-                [-1, -2, -1],
-                [0, 0, 0],
-                [1, 2, 1]
-            ];
+            const blob = await new Promise(resolve => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = originalImage.width;
+                tempCanvas.height = originalImage.height;
+                tempCanvas.getContext('2d').drawImage(originalImage, 0, 0);
+                tempCanvas.toBlob(resolve, 'image/png');
+            });
+            
+            const formData = new FormData();
+            formData.append('image_file', blob, 'source.png');
 
-            for (let y = 1; y < imageData.height - 1; y++) {
-                for (let x = 1; x < imageData.width - 1; x++) {
-                    let pixelX = 0;
-                    let pixelY = 0;
-                    for (let j = -1; j <= 1; j++) {
-                        for (let i = -1; i <= 1; i++) {
-                            const pixel = grayscaleData[(y + j) * imageData.width + (x + i)];
-                            pixelX += pixel * sobelX[j + 1][i + 1];
-                            pixelY += pixel * sobelY[j + 1][i + 1];
-                        }
-                    }
-                    const magnitude = Math.sqrt(pixelX * pixelX + pixelY * pixelY) >>> 0;
-                    const index = (y * imageData.width + x) * 4;
-                    sobelData[index] = magnitude;
-                    sobelData[index + 1] = magnitude;
-                    sobelData[index + 2] = magnitude;
-                    sobelData[index + 3] = 255;
+            try {
+                const response = await fetch('https://clipdrop-api.co/remove-background/v1', {
+                    method: 'POST',
+                    headers: { 'x-api-key': apiKey },
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Clipdrop API Error (${response.status}): ${errorText}`);
                 }
+                
+                const imageBlob = await response.blob();
+                const imageBitmap = await createImageBitmap(imageBlob);
+
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+                tempCanvas.width = imageBitmap.width;
+                tempCanvas.height = imageBitmap.height;
+                tempCtx.drawImage(imageBitmap, 0, 0);
+
+                foregroundMaskData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                return true;
+
+            } catch (error) {
+                console.error('Error fetching foreground mask:', error);
+                alert(`Failed to get mask from Clipdrop API. ${error.message}`);
+                removeBackgroundToggle.checked = false;
+                return false;
+            } finally {
+                generateButton.disabled = false;
+                generateButton.textContent = originalButtonText;
+                removeBackgroundToggle.disabled = false;
             }
-            ctx.putImageData(new ImageData(sobelData, imageData.width, imageData.height), 0, 0);
         }
 
         function generatePatternForDisplay() {
@@ -642,6 +745,7 @@
                 else { canvasHeight = downloadMaxDim; canvasWidth = downloadMaxDim * currentAspectRatio; }
             } else {
                 const containerRect = canvas.parentElement.getBoundingClientRect();
+                 if (!containerRect || containerRect.width === 0) { return; }
                  if (containerRect.width / containerRect.height > currentAspectRatio) {
                     canvasHeight = containerRect.height;
                     canvasWidth = canvasHeight * currentAspectRatio;
@@ -666,29 +770,34 @@
                 return;
             }
             
-            const analysisImageData = getAnalysisData();
-            if (!analysisImageData) {
-                 if (analysisModeSelect.value === 'foregroundMask') {
-                    ctx.fillStyle = "#9ca3af";
-                    ctx.font = "14px 'Roboto Mono'";
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText("Generate to get AI Mask", canvas.width / 2, canvas.height / 2);
-                 }
-                return;
-            }
-
-            const data = analysisImageData.data;
-            const sourceWidth = analysisImageData.width;
-            
             const density = parseInt(patternDensitySlider.value);
             const randomness = parseFloat(randomnessSlider.value);
             const minScale = parseFloat(minShapeScaleSlider.value);
             const maxScale = parseFloat(maxShapeScaleSlider.value);
             const invert = invertToggle.checked;
             const analysisMode = analysisModeSelect.value;
+            const sensitivity = parseFloat(brightnessThresholdSlider.value);
+            const contrast = parseFloat(hslContrastSlider.value);
+            const targetColor = analysisMode === 'colorMatch' ? hexToRgb(colorMatchColorPicker.value) : null;
             const shapeColor = getSelectedRadioValue('shapeColor');
             ctx.fillStyle = shapeColor;
+            
+            const colorCanvas = document.createElement('canvas');
+            colorCanvas.width = originalImage.width;
+            colorCanvas.height = originalImage.height;
+            const colorCtx = colorCanvas.getContext('2d', { willReadFrequently: true });
+            colorCtx.drawImage(originalImage, 0, 0);
+            const originalColorImageData = colorCtx.getImageData(0, 0, originalImage.width, originalImage.height);
+            
+            let processedImageData;
+            if (analysisMode === 'colorDissimilarity') {
+                processedImageData = createDissimilarityMap(originalColorImageData);
+            } else {
+                processedImageData = offscreenImageCtx.getImageData(0, 0, offscreenImageCanvas.width, offscreenImageCanvas.height);
+            }
+            
+            const data = processedImageData.data;
+            const colorData = originalColorImageData.data;
             
             const gridCols = density;
             const gridRows = Math.round(density / currentAspectRatio);
@@ -697,48 +806,56 @@
 
             for (let row = 0; row < gridRows; row++) {
                 for (let col = 0; col < gridCols; col++) {
-                    const sampleX = Math.floor((col + 0.5) / gridCols * sourceWidth);
-                    const sampleY = Math.floor((row + 0.5) / gridRows * sourceWidth / currentAspectRatio);
-                    const pixelIndex = (sampleY * sourceWidth + sampleX) * 4;
+                    const sampleX = Math.floor((col + 0.5) / gridCols * originalImage.width);
+                    const sampleY = Math.floor((row + 0.5) / gridRows * originalImage.height);
+                    const pixelIndex = (sampleY * originalImage.width + sampleX) * 4;
                     
-                    let strengthFactor = 0;
-
-                    switch (analysisMode) {
-                        case 'luminance': {
-                             const brightness = data[pixelIndex]; 
-                            const relativeSensitivity = parseInt(brightnessThresholdSlider.value);
-                            const sensitivityMultiplier = 1.0 + (relativeSensitivity / 100.0);
-                             const baseStrength = invert ? (brightness / 255.0) : ((255.0 - brightness) / 255.0);
-                            strengthFactor = Math.pow(baseStrength, 1/sensitivityMultiplier);
-                            break;
-                        }
-                        case 'colorMatch': {
-                            const targetColor = hexToRgb(colorMatchColorPicker.value);
-                            const threshold = parseInt(colorMatchThresholdSlider.value);
-                            if(targetColor) {
-                                const r = data[pixelIndex], g = data[pixelIndex+1], b = data[pixelIndex+2];
-                                const dist = Math.sqrt(Math.pow(r-targetColor.r,2)+Math.pow(g-targetColor.g,2)+Math.pow(b-targetColor.b,2));
-                                strengthFactor = Math.max(0, 1 - (dist / threshold));
-                                if(invert) strengthFactor = 1 - strengthFactor;
-                            }
-                            break;
-                        }
-                        case 'edgeDetection': {
-                            const brightness = data[pixelIndex];
-                            const threshold = parseInt(brightnessThresholdSlider.value);
-                            strengthFactor = brightness > threshold ? 1 : 0;
-                            if (invert) strengthFactor = 1 - strengthFactor;
-                            break;
-                        }
-                        case 'foregroundMask': {
-                            const brightness = data[pixelIndex];
-                            strengthFactor = brightness / 255;
-                            if (invert) strengthFactor = 1 - strengthFactor;
-                            break;
+                    if (removeBackgroundToggle.checked && foregroundMaskData) {
+                        const maskAlpha = foregroundMaskData.data[pixelIndex + 3]; // Check alpha channel of the mask
+                        if (maskAlpha < 128) { // If transparent
+                            continue; // Skip this pixel
                         }
                     }
 
-                    if (strengthFactor > 0.1) { // Threshold to draw
+                    let strengthFactor = 0;
+                    let conditionMet = false;
+
+                    switch (analysisMode) {
+                        case 'luminance': {
+                            const brightness = data[pixelIndex];
+                            const sensitivityMultiplier = 1.0 + (sensitivity / 100.0);
+                            const baseStrength = invert ? (brightness / 255.0) : ((255.0 - brightness) / 255.0);
+                            if (baseStrength > 0.01) { strengthFactor = baseStrength * sensitivityMultiplier; conditionMet = true; }
+                            break;
+                        }
+                        case 'hslAnalysis': {
+                            const r = colorData[pixelIndex], g = colorData[pixelIndex + 1], b = colorData[pixelIndex + 2];
+                            const { l } = rgbToHsl(r, g, b);
+                            let baseStrength = (1.0 - l);
+                            baseStrength = Math.pow(baseStrength, sensitivity);
+                            baseStrength = 0.5 + contrast * (baseStrength - 0.5);
+                            strengthFactor = baseStrength;
+                            if (invert) strengthFactor = 1.0 - strengthFactor;
+                            conditionMet = true;
+                            break;
+                        }
+                        case 'colorDissimilarity': {
+                            const textureStrength = data[pixelIndex] / 255.0;
+                            strengthFactor = textureStrength * sensitivity;
+                            if (invert) strengthFactor = (1.0 - (data[pixelIndex] / 255.0)) * sensitivity;
+                            conditionMet = true;
+                            break;
+                        }
+                        case 'colorMatch': {
+                             const r = colorData[pixelIndex], g = colorData[pixelIndex + 1], b = colorData[pixelIndex + 2];
+                             const distance = calculateColorDistance(r, g, b, targetColor.r, targetColor.g, targetColor.b);
+                             const threshold = parseInt(colorMatchThresholdSlider.value);
+                             if ((invert && distance > threshold) || (!invert && distance <= threshold)) { strengthFactor = 1.0; conditionMet = true; }
+                             break;
+                        }
+                    }
+
+                    if (conditionMet && strengthFactor > 0) {
                         strengthFactor = Math.max(0, Math.min(1, strengthFactor));
                         const scale = minScale + strengthFactor * (maxScale - minScale);
                         const shapeSize = Math.min(cellWidth, cellHeight) * scale;
@@ -750,82 +867,11 @@
                 }
             }
         }
-
-        async function fetchForegroundMask() {
-            const apiKey = CLIPDROP_API_KEY;
-            if (!apiKey || apiKey === "USEAPIHERECAIO") {
-                alert('API key is missing. Please add it to the script.');
-                return false;
-            }
-
-            generateButton.disabled = true;
-            generateButton.textContent = "Getting AI Mask...";
-            
-            const blob = await new Promise(resolve => offscreenImageCanvas.toBlob(resolve, 'image/png'));
-            
-            const formData = new FormData();
-            formData.append('image_file', blob, 'source.png');
-
-            try {
-                const response = await fetch('https://clipdrop-api.co/remove-background/v1', {
-                    method: 'POST',
-                    headers: { 'x-api-key': apiKey },
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Clipdrop API Error (${response.status}): ${errorText}`);
-                }
-                
-                const imageBlob = await response.blob();
-                const imageBitmap = await createImageBitmap(imageBlob);
-
-                // Create a temporary canvas to get the alpha channel
-                const tempCanvas = document.createElement('canvas');
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCanvas.width = imageBitmap.width;
-                tempCanvas.height = imageBitmap.height;
-                tempCtx.drawImage(imageBitmap, 0, 0);
-
-                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                const data = imageData.data;
-                const maskData = new Uint8ClampedArray(data.length);
-
-                for (let i = 0; i < data.length; i += 4) {
-                    const alpha = data[i + 3]; // Get alpha value
-                    maskData[i] = alpha;     // Set R, G, B to the alpha value
-                    maskData[i + 1] = alpha;
-                    maskData[i + 2] = alpha;
-                    maskData[i + 3] = 255;   // Make mask fully opaque
-                }
-                
-                const maskImageData = new ImageData(maskData, tempCanvas.width, tempCanvas.height);
-
-                offscreenMaskCanvas.width = maskImageData.width;
-                offscreenMaskCanvas.height = maskImageData.height;
-                offscreenMaskCtx.putImageData(maskImageData, 0, 0);
-                
-                return true;
-
-            } catch (error) {
-                console.error('Error fetching foreground mask:', error);
-                alert(`Failed to get mask from Clipdrop API. ${error.message}`);
-                return false;
-            } finally {
-                 generateButton.disabled = false;
-                 generateButton.textContent = "GENERATE & DOWNLOAD";
-            }
-        }
         
         function drawShape(ctx, x, y, size, isCircle) {
             ctx.beginPath();
-            if (isCircle) {
-                ctx.arc(x, y, size / 2, 0, Math.PI * 2);
-            } else {
-                const side = size * 0.75;
-                ctx.rect(x - side / 2, y - side / 2, side, side);
-            }
+            if (isCircle) { ctx.arc(x, y, size / 2, 0, Math.PI * 2); } 
+            else { const side = size * 0.75; ctx.rect(x - side / 2, y - side / 2, side, side); }
             ctx.fill();
         }
 
@@ -834,7 +880,10 @@
             return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
         }
 
-        document.addEventListener('DOMContentLoaded', initialize);
+        document.addEventListener('DOMContentLoaded', () => {
+            initialize();
+            handleAnalysisModeChange();
+        });
     </script>
 </body>
 </html>
