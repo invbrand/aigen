@@ -196,11 +196,7 @@
                         </div>
                     </div>
                     <hr/>
-                    <!-- NEW: Background Removal Section -->
-                     <div class="control-group">
-                        <label for="clipdropApiKey" class="control-label">Clipdrop API Key</label>
-                        <input type="text" id="clipdropApiKey" class="text-input" placeholder="Paste your API key here">
-                    </div>
+                    <!-- Background Removal Section -->
                      <div class="control-group flex items-center justify-between">
                         <label for="removeBackgroundToggle" class="control-label !mb-0">REMOVE BACKGROUND (AI)</label>
                         <input type="checkbox" id="removeBackgroundToggle" class="h-4 w-4 text-black border-gray-400 rounded focus:ring-black" style="accent-color: #000000;" />
@@ -262,6 +258,8 @@
 
     <script>
         // --- CONFIGURATION ---
+        const CLIPDROP_API_KEY = "957b940ba584386d8f030ea54ff0e9e94b77f226714031a560405b7ae1f88828c5e6fd886ab7dedaa4b50ecbae81f15b"; // <-- PASTE YOUR API KEY HERE
+
         const BRAND_COLORS_CONFIG = [
             { name: "White", hex: "#FFFFFF" }, { name: "Black", hex: "#0F0F0F" },
             { name: "Midnight Blue", hex: "#24248E" }, { name: "Optimist Blue", hex: "#0C76FE" },
@@ -305,7 +303,6 @@
         const colorMatchThresholdValue = document.getElementById('colorMatchThresholdValue');
         const colorMatchColorPicker = document.getElementById('colorMatchColorPicker');
 
-        const clipdropApiKeyInput = document.getElementById('clipdropApiKey');
         const removeBackgroundToggle = document.getElementById('removeBackgroundToggle');
 
         const bgColorPickerContainer = document.getElementById('bgColorPickerContainer');
@@ -674,9 +671,9 @@
         }
 
         async function fetchForegroundMask() {
-            const apiKey = clipdropApiKeyInput.value;
-            if (!apiKey) {
-                alert('Clipdrop API key is missing. Please add it to the input field.');
+            const apiKey = CLIPDROP_API_KEY;
+            if (!apiKey || apiKey === "CAIOAPIHERE") {
+                alert('API key is missing. Please add it to the script.');
                 removeBackgroundToggle.checked = false;
                 return false;
             }
