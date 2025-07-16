@@ -215,7 +215,7 @@
                 <div class="colors-section pt-2">
                     <span class="group-label font-bold text-xs uppercase">COLORS</span>
                      <div class="flex flex-col space-y-3 mt-2">
-                        <div class="flex items-center">
+                         <div class="flex items-center">
                             <span class="color-picker-label w-28 flex-shrink-0">SHAPE</span>
                             <div id="shapeColorPickerContainer" class="picker-group"></div>
                         </div>
@@ -232,25 +232,27 @@
                 </div>
 
                 <button id="generateButton" class="action-button w-full !mt-8 !py-3">GENERATE & DOWNLOAD</button>
+                <!-- NOVO BOTÃO SVG -->
+                <button id="exportSvgButton" class="action-button w-full !mt-2 !py-3 bg-green-600 hover:bg-green-700">Exportar SVG</button>
             </div>
 
             <!-- Previews Column -->
             <div class="flex-1 flex flex-col gap-4">
                  <div class="flex flex-col items-center">
-                    <p class="text-xs text-gray-500 uppercase mb-2">Original Image</p>
-                    <div id="dropZone" class="preview-container cursor-pointer">
-                        <img id="imagePreview" src="#" alt="Upload area" class="hidden"/>
-                        <div id="dropZoneContent" class="text-center text-gray-400 text-sm p-4">
+                     <p class="text-xs text-gray-500 uppercase mb-2">Original Image</p>
+                     <div id="dropZone" class="preview-container cursor-pointer">
+                         <img id="imagePreview" src="#" alt="Upload area" class="hidden"/>
+                         <div id="dropZoneContent" class="text-center text-gray-400 text-sm p-4">
                              <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
                              <p class="mt-2 font-semibold">CLICK OR DRAG IMAGE HERE</p>
-                        </div>
+                         </div>
                     </div>
                  </div>
                  <div class="flex flex-col items-center">
                      <p class="text-xs text-gray-500 uppercase mb-2">Pattern Preview</p>
                      <div id="patternPreviewContainer" class="preview-container">
-                        <canvas id="patternPreviewCanvas"></canvas>
-                     </div>
+                         <canvas id="patternPreviewCanvas"></canvas>
+                    </div>
                  </div>
             </div>
         </div>
@@ -367,6 +369,8 @@
             });
 
             generateButton.addEventListener('click', handleDownload);
+            // ADICIONAR O LISTENER PARA O NOVO BOTÃO SVG
+            document.getElementById('exportSvgButton').addEventListener('click', handleExportSvg);
         }
 
         // --- UI Population ---
@@ -425,11 +429,9 @@
                     offscreenImageCanvas.width = originalImage.width;
                     offscreenImageCanvas.height = originalImage.height;
                     
-                    // Reset AI mask on new image upload
                     foregroundMaskData = null;
                     removeBackgroundToggle.checked = false;
 
-                    // Apply histogram equalization for luminance mode
                     equalizeHistogram();
 
                     updatePreviewPanes(e.target.result);
@@ -453,12 +455,10 @@
             const mode = analysisModeSelect.value;
             const lumaLabel = luminanceControl.querySelector('label');
             
-            // Hide all special controls first
             luminanceControl.classList.add('hidden');
             colorMatchControl.classList.add('hidden');
             hslContrastControl.classList.add('hidden');
             
-            // Default to showing the main sensitivity slider
             luminanceControl.classList.remove('hidden');
 
             switch(mode) {
@@ -875,6 +875,158 @@
         function hexToRgb(hex) {
             const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
             return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+        }
+
+        /**
+         * Gera o conteúdo de um arquivo SVG com base nas configurações atuais.
+         * @returns {string} Uma string contendo o código SVG completo.
+         */
+        function generateSvgString() {
+            if (!originalImage) return '';
+
+            const selectedResolution = parseInt(getSelectedRadioValue('downloadResolution'));
+            let canvasWidth, canvasHeight;
+            let currentAspectRatio = originalImage.width / originalImage.height;
+
+            if (currentAspectRatio >= 1) {
+                canvasWidth = selectedResolution;
+                canvasHeight = selectedResolution / currentAspectRatio;
+            } else {
+                canvasHeight = selectedResolution;
+                canvasWidth = selectedResolution * currentAspectRatio;
+            }
+            canvasWidth = Math.round(canvasWidth);
+            canvasHeight = Math.round(canvasHeight);
+
+            const bgColor = getSelectedRadioValue('backgroundColor');
+            const shapeColor = getSelectedRadioValue('shapeColor');
+            
+            let svgElements = [];
+            svgElements.push(`<rect width="100%" height="100%" fill="${bgColor}" />`);
+
+            const density = parseInt(patternDensitySlider.value);
+            const randomness = parseFloat(randomnessSlider.value);
+            const minScale = parseFloat(minShapeScaleSlider.value);
+            const maxScale = parseFloat(maxShapeScaleSlider.value);
+            const invert = invertToggle.checked;
+            const analysisMode = analysisModeSelect.value;
+            const sensitivity = parseFloat(brightnessThresholdSlider.value);
+            const contrast = parseFloat(hslContrastSlider.value);
+            const targetColor = analysisMode === 'colorMatch' ? hexToRgb(colorMatchColorPicker.value) : null;
+
+            const colorCanvas = document.createElement('canvas');
+            colorCanvas.width = originalImage.width;
+            colorCanvas.height = originalImage.height;
+            const colorCtx = colorCanvas.getContext('2d', { willReadFrequently: true });
+            colorCtx.drawImage(originalImage, 0, 0);
+            const originalColorImageData = colorCtx.getImageData(0, 0, originalImage.width, originalImage.height);
+            
+            let processedImageData;
+            if (analysisMode === 'colorDissimilarity') {
+                processedImageData = createDissimilarityMap(originalColorImageData);
+            } else {
+                processedImageData = offscreenImageCtx.getImageData(0, 0, offscreenImageCanvas.width, offscreenImageCanvas.height);
+            }
+            
+            const data = processedImageData.data;
+            const colorData = originalColorImageData.data;
+            
+            const gridCols = density;
+            const gridRows = Math.round(density / currentAspectRatio);
+            const cellWidth = canvasWidth / gridCols;
+            const cellHeight = canvasHeight / gridRows;
+
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    const sampleX = Math.floor((col + 0.5) / gridCols * originalImage.width);
+                    const sampleY = Math.floor((row + 0.5) / gridRows * originalImage.height);
+                    const pixelIndex = (sampleY * originalImage.width + sampleX) * 4;
+                    
+                    if (removeBackgroundToggle.checked && foregroundMaskData) {
+                        if (foregroundMaskData.data[pixelIndex + 3] < 128) continue;
+                    }
+
+                    let strengthFactor = 0;
+                    let conditionMet = false;
+
+                    switch (analysisMode) {
+                        case 'luminance': {
+                            const brightness = data[pixelIndex];
+                            const sensitivityMultiplier = 1.0 + (sensitivity / 100.0);
+                            const baseStrength = invert ? (brightness / 255.0) : ((255.0 - brightness) / 255.0);
+                            if (baseStrength > 0.01) { strengthFactor = baseStrength * sensitivityMultiplier; conditionMet = true; }
+                            break;
+                        }
+                        case 'hslAnalysis': {
+                            const r = colorData[pixelIndex], g = colorData[pixelIndex + 1], b = colorData[pixelIndex + 2];
+                            const { l } = rgbToHsl(r, g, b);
+                            let baseStrength = (1.0 - l);
+                            baseStrength = Math.pow(baseStrength, sensitivity);
+                            baseStrength = 0.5 + contrast * (baseStrength - 0.5);
+                            strengthFactor = baseStrength;
+                            if (invert) strengthFactor = 1.0 - strengthFactor;
+                            conditionMet = true;
+                            break;
+                        }
+                        case 'colorDissimilarity': {
+                            const textureStrength = data[pixelIndex] / 255.0;
+                            strengthFactor = textureStrength * sensitivity;
+                            if (invert) strengthFactor = (1.0 - (data[pixelIndex] / 255.0)) * sensitivity;
+                            conditionMet = true;
+                            break;
+                        }
+                        case 'colorMatch': {
+                            const r = colorData[pixelIndex], g = colorData[pixelIndex + 1], b = colorData[pixelIndex + 2];
+                            const distance = calculateColorDistance(r, g, b, targetColor.r, targetColor.g, targetColor.b);
+                            const threshold = parseInt(colorMatchThresholdSlider.value);
+                            if ((invert && distance > threshold) || (!invert && distance <= threshold)) { strengthFactor = 1.0; conditionMet = true; }
+                            break;
+                        }
+                    }
+
+                    if (conditionMet && strengthFactor > 0) {
+                        strengthFactor = Math.max(0, Math.min(1, strengthFactor));
+                        const scale = minScale + strengthFactor * (maxScale - minScale);
+                        const shapeSize = Math.min(cellWidth, cellHeight) * scale;
+                        const centerX = (col + 0.5) * cellWidth;
+                        const centerY = (row + 0.5) * cellHeight;
+                        const isCircle = Math.random() < randomness;
+
+                        if (isCircle) {
+                            svgElements.push(`<circle cx="${centerX.toFixed(3)}" cy="${centerY.toFixed(3)}" r="${(shapeSize / 2).toFixed(3)}" fill="${shapeColor}" />`);
+                        } else {
+                            const side = shapeSize * 0.75;
+                            const x = centerX - side / 2;
+                            const y = centerY - side / 2;
+                            svgElements.push(`<rect x="${x.toFixed(3)}" y="${y.toFixed(3)}" width="${side.toFixed(3)}" height="${side.toFixed(3)}" fill="${shapeColor}" />`);
+                        }
+                    }
+                }
+            }
+            return `<svg width="${canvasWidth}" height="${canvasHeight}" xmlns="http://www.w3.org/2000/svg">${svgElements.join('')}</svg>`;
+        }
+
+        /**
+         * Lida com o clique no botão de exportar SVG.
+         */
+        function handleExportSvg() {
+            if (!originalImage) {
+                alert("Please upload an image first.");
+                return;
+            }
+            const svgString = generateSvgString();
+            if (!svgString) {
+                alert("Could not generate SVG.");
+                return;
+            }
+
+            const blob = new Blob([svgString], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `pattern-export.svg`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
