@@ -210,6 +210,11 @@
                         <label for="maxShapeScaleSlider" class="control-label">MAX SHAPE SIZE <span id="maxShapeScaleValue" class="slider-value-label">(0.90)</span></label>
                         <input type="range" id="maxShapeScaleSlider" min="0.01" max="1.0" value="0.90" step="0.01" class="slider w-full">
                     </div>
+                    <!-- NOVO SLIDER -->
+                    <div class="control-group">
+                        <label for="squareScaleSlider" class="control-label">SQUARE / CIRCLE PROPORTION <span id="squareScaleValue" class="slider-value-label">(0.90)</span></label>
+                        <input type="range" id="squareScaleSlider" min="0" max="2" value="0.9" step="0.01" class="slider w-full">
+                    </div>
                 </div>
 
                 <div class="colors-section pt-2">
@@ -232,7 +237,6 @@
                 </div>
 
                 <button id="generateButton" class="action-button w-full !mt-8 !py-3">GENERATE & DOWNLOAD</button>
-                <!-- NOVO BOTÃO SVG -->
                 <button id="exportSvgButton" class="action-button w-full !mt-2 !py-3 bg-green-600 hover:bg-green-700">Exportar SVG</button>
             </div>
 
@@ -289,6 +293,8 @@
         const minShapeScaleValueDisplay = document.getElementById('minShapeScaleValue');
         const maxShapeScaleSlider = document.getElementById('maxShapeScaleSlider');
         const maxShapeScaleValueDisplay = document.getElementById('maxShapeScaleValue');
+        const squareScaleSlider = document.getElementById('squareScaleSlider'); // NOVO
+        const squareScaleValueDisplay = document.getElementById('squareScaleValue'); // NOVO
         const invertToggle = document.getElementById('invertToggle');
         
         const analysisModeSelect = document.getElementById('analysisModeSelect');
@@ -323,7 +329,6 @@
         let originalImage = null;
         let imageAspectRatio = 1;
         let foregroundMaskData = null; // To store the AI mask
-        // Canvas for grayscale/equalized image processing
         let offscreenImageCanvas = document.createElement('canvas');
         let offscreenImageCtx = offscreenImageCanvas.getContext('2d', { willReadFrequently: true });
         offscreenImageCtx.imageSmoothingEnabled = false;
@@ -338,7 +343,7 @@
         }
 
         function addEventListeners() {
-            const sliders = [patternDensitySlider, randomnessSlider, brightnessThresholdSlider, hslContrastSlider, minShapeScaleSlider, maxShapeScaleSlider, colorMatchThresholdSlider];
+            const sliders = [patternDensitySlider, randomnessSlider, brightnessThresholdSlider, hslContrastSlider, minShapeScaleSlider, maxShapeScaleSlider, colorMatchThresholdSlider, squareScaleSlider]; // Adicionado o novo slider
             sliders.forEach(slider => {
                 slider.addEventListener('input', () => {
                     updateSliderValueDisplays();
@@ -369,7 +374,6 @@
             });
 
             generateButton.addEventListener('click', handleDownload);
-            // ADICIONAR O LISTENER PARA O NOVO BOTÃO SVG
             document.getElementById('exportSvgButton').addEventListener('click', handleExportSvg);
         }
 
@@ -524,6 +528,7 @@
         function updateSliderValueDisplays() {
             patternDensityValueDisplay.textContent = `(${patternDensitySlider.value})`;
             randomnessValueDisplay.textContent = `(${parseFloat(randomnessSlider.value).toFixed(2)})`;
+            squareScaleValueDisplay.textContent = `(${parseFloat(squareScaleSlider.value).toFixed(2)})`; // NOVO
             
             const mode = analysisModeSelect.value;
             const sensitivityValue = parseFloat(brightnessThresholdSlider.value);
@@ -771,6 +776,7 @@
             const randomness = parseFloat(randomnessSlider.value);
             const minScale = parseFloat(minShapeScaleSlider.value);
             const maxScale = parseFloat(maxShapeScaleSlider.value);
+            const squareScale = parseFloat(squareScaleSlider.value); // NOVO
             const invert = invertToggle.checked;
             const analysisMode = analysisModeSelect.value;
             const sensitivity = parseFloat(brightnessThresholdSlider.value);
@@ -808,9 +814,9 @@
                     const pixelIndex = (sampleY * originalImage.width + sampleX) * 4;
                     
                     if (removeBackgroundToggle.checked && foregroundMaskData) {
-                        const maskAlpha = foregroundMaskData.data[pixelIndex + 3]; // Check alpha channel of the mask
-                        if (maskAlpha < 128) { // If transparent
-                            continue; // Skip this pixel
+                        const maskAlpha = foregroundMaskData.data[pixelIndex + 3];
+                        if (maskAlpha < 128) {
+                            continue;
                         }
                     }
 
@@ -859,16 +865,16 @@
                         const centerX = (col + 0.5) * cellWidth;
                         const centerY = (row + 0.5) * cellHeight;
                         const isCircle = Math.random() < randomness;
-                        drawShape(ctx, centerX, centerY, shapeSize, isCircle);
+                        drawShape(ctx, centerX, centerY, shapeSize, isCircle, squareScale); // Passar o novo valor
                     }
                 }
             }
         }
         
-        function drawShape(ctx, x, y, size, isCircle) {
+        function drawShape(ctx, x, y, size, isCircle, squareScale) { // Receber o novo valor
             ctx.beginPath();
             if (isCircle) { ctx.arc(x, y, size / 2, 0, Math.PI * 2); } 
-            else { const side = size * 0.75; ctx.rect(x - side / 2, y - side / 2, side, side); }
+            else { const side = size * squareScale; ctx.rect(x - side / 2, y - side / 2, side, side); } // Usar o novo valor
             ctx.fill();
         }
 
@@ -877,10 +883,6 @@
             return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
         }
 
-        /**
-         * Gera o conteúdo de um arquivo SVG com base nas configurações atuais.
-         * @returns {string} Uma string contendo o código SVG completo.
-         */
         function generateSvgString() {
             if (!originalImage) return '';
 
@@ -908,6 +910,7 @@
             const randomness = parseFloat(randomnessSlider.value);
             const minScale = parseFloat(minShapeScaleSlider.value);
             const maxScale = parseFloat(maxShapeScaleSlider.value);
+            const squareScale = parseFloat(squareScaleSlider.value); // NOVO
             const invert = invertToggle.checked;
             const analysisMode = analysisModeSelect.value;
             const sensitivity = parseFloat(brightnessThresholdSlider.value);
@@ -995,7 +998,7 @@
                         if (isCircle) {
                             svgElements.push(`<circle cx="${centerX.toFixed(3)}" cy="${centerY.toFixed(3)}" r="${(shapeSize / 2).toFixed(3)}" fill="${shapeColor}" />`);
                         } else {
-                            const side = shapeSize * 0.75;
+                            const side = shapeSize * squareScale; // USAR O NOVO VALOR
                             const x = centerX - side / 2;
                             const y = centerY - side / 2;
                             svgElements.push(`<rect x="${x.toFixed(3)}" y="${y.toFixed(3)}" width="${side.toFixed(3)}" height="${side.toFixed(3)}" fill="${shapeColor}" />`);
@@ -1006,9 +1009,6 @@
             return `<svg width="${canvasWidth}" height="${canvasHeight}" xmlns="http://www.w3.org/2000/svg">${svgElements.join('')}</svg>`;
         }
 
-        /**
-         * Lida com o clique no botão de exportar SVG.
-         */
         function handleExportSvg() {
             if (!originalImage) {
                 alert("Please upload an image first.");
